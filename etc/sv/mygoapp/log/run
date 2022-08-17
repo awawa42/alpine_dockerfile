@@ -1,0 +1,7 @@
+#!/bin/sh
+
+#chown _runit-log:adm '/var/log/runit/ssh'
+mkdir -p '/var/log/runit/mygoapp'
+chmod 750 '/var/log/runit/mygoapp'
+
+exec svlogd -tt '/var/log/runit/mygoapp'

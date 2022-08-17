@@ -1,0 +1,13 @@
+#!/bin/sh
+
+NAME="ssh-nonroot"
+echo "Starting $NAME..."
+sv start auditd  || sv check auditd || true
+
+#Create /run/sshd
+test -d /run/sshd || mkdir /run/sshd && chmod 0755 /run/sshd
+
+exec 2>&1
+
+echo "Starting $NAME..."
+exec /usr/sbin/sshd -D -e $SSHD_OPTS -f /etc/sv/ssh-nonroot/sshd_conf

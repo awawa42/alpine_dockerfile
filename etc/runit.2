@@ -1,0 +1,62 @@
+#!/bin/sh
+
+PATH=/usr/local/bin:/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/X11R6/bin
+
+USE_NONROOT_SSHD=0
+test -z "$custssh"||USE_NONROOT_SSHD=1
+#set authorized_keys
+mkdir -p /root/.ssh && chmod 700 /root/.ssh
+#mkdir -p /run/sshd && chmod 755 /run/sshd
+touch /root/.ssh/authorized_keys
+chmod 644 /root/.ssh/authorized_keys
+if [ -w /root/.ssh/authorized_keys ];then
+    test -n "$sshkey1" && echo "$sshkey1" >> /root/.ssh/authorized_keys
+    test -n "$sshkey2" && echo "$sshkey2" >> /root/.ssh/authorized_keys
+else
+    echo "authorized_keys not writable!"
+    USE_NONROOT_SSHD=1
+fi
+
+#deal with non root user
+username=$(whoami)
+if [ ! "$username" = "root" ];then
+echo "user $username"
+USE_NONROOT_SSHD=1
+sed -Ei "/^$username/s#:/.*:/bin/[baz]{0,1}sh#:/root:/bin/zsh#g" /etc/passwd || cp -rlf /root/.* ~ > /dev/null 2>&1
+fi
+
+PORT22CNT=$(awk '$2~/:0016$/ && $4 ~ /0A/' /proc/net/tcp|wc -l)
+if [ $PORT22CNT -gt 0 ];then
+    echo "port 22 already in use"
+    USE_NONROOT_SSHD=1
+fi
+
+if [ $USE_NONROOT_SSHD -eq 1 ];then
+    echo "use non root sshd at port 22222"
+    test -n "$sshkey1" && echo "$sshkey1" >> ~/.authorized_keys.alt
+    test -n "$sshkey2" && echo "$sshkey2" >> ~/.authorized_keys.alt
+    test -e ~/.authorized_keys.alt && chmod 644 ~/.authorized_keys.alt
+    ln -sf /etc/sv/ssh-nonroot /etc/service/
+    unlink /etc/service/ssh
+fi
+
+# Myapp configs
+test -z "$VUUID" && VUUID="4bc947b4-f509-4192-8b70-628eda7c7d9d"
+test -z "$PORT" && PORT=443
+sed -e "s/\$VUUID/$VUUID/g" /opt/mygoapp/mygoapp.json >/etc/mygoapp.json
+sed -e "s/\$PORT/$PORT/g" -e "s/\$VUUID/$VUUID/g" /opt/mygoapp/nginx.conf > "/etc/nginx/http.d/$PORT.conf"
+
+# enable sshp
+if [ -n "$psshkey" ]&&[ -n "$pssharg" ];then
+psshkey_file="$(mktemp)"
+chmod 600 "$psshkey_file"
+echo "$psshkey" > "$psshkey_file"
+sed -Ei 's/\\n/\n/g' "$psshkey_file"
+ssharg2="-i $psshkey_file -TN -o StrictHostKeyChecking=no -o ExitOnForwardFailure=yes -o ServerAliveInterval=20 $pssharg"
+echo " setting sshp exec /usr/bin/ssh $ssharg2 > /dev/null 2>&1 ; sleep 15"
+echo "exec /usr/bin/ssh $ssharg2 > /dev/null 2>&1 ; sleep 15" >> /etc/sv/sshp/run
+ln -s /etc/sv/sshp /etc/service/
+fi
+
+exec env - PATH=$PATH \
+runsvdir -P /etc/service 'log: ...........................................................................................................................................................................................................................................................................................................................................................................................................' 

@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "starting mygoapp"
+exec /opt/mygoapp/mygoapp -c /etc/mygoapp.json  > /dev/null 2>&1

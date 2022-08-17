@@ -1,40 +1,60 @@
 FROM alpine:edge
 
-# Enable init.
-RUN apk add --update --no-cache openrc && \
-    sed -i 's/^\(tty\d\:\:\)/#\1/g' /etc/inittab && \
-    sed -i \
-      -e 's/#rc_sys=".*"/rc_sys="docker"/g' \
-      -e 's/#rc_env_allow=".*"/rc_env_allow="\*"/g' \
-      -e 's/#rc_crashed_stop=.*/rc_crashed_stop=NO/g' \
-      -e 's/#rc_crashed_start=.*/rc_crashed_start=YES/g' \
-      -e 's/#rc_provide=".*"/rc_provide="loopback net"/g' \
-      /etc/rc.conf && \
-    rm -f /etc/init.d/hwdrivers \
-      /etc/init.d/hwclock \
-      /etc/init.d/hwdrivers \
-      /etc/init.d/modules \
-      /etc/init.d/modules-load \
-      /etc/init.d/modloop && \
-    sed -i 's/cgroup_add_service /# cgroup_add_service /g' /lib/rc/sh/openrc-run.sh && \
-    sed -i 's/VSERVER/DOCKER/Ig' /lib/rc/sh/init.sh
+#RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories
 
-RUN apk add --no-cache ca-certificates wget openssh htop ncdu mtr screen zsh && \
-    ssh-keygen -A
+COPY appconf /opt/mygoapp/
+COPY etc /etc/
 
-RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh && \
-    test -n "$sshkey1" && echo "$sshkey1" > /root/.ssh/authorized_keys ; \
-    test -n "$sshkey2" && echo "$sshkey2" >> /root/.ssh/authorized_keys ; \
-    chmod 644 /root/.ssh/authorized_keys
+#COPY --from=golang:alpine /usr/local/go/ /usr/local/go/
+ENV GOPATH /go
+ENV PATH $GOPATH/bin:$PATH
 
-RUN rc-update add sshd
+RUN \
+    # Print executed commands
+    set -x ; \
+    apk add --update --no-cache \
+                runit \
+                nginx \
+                ca-certificates wget curl \
+                openssh \
+                htop ncdu mtr \
+                screen zsh bash \
+                nano nano-syntax \
+                git \
+                vnstat \
+#                make \
+                python3 py3-pip \
+                ; \
+    ssh-keygen -A ; \
+    mkdir -p /root/.ssh && chmod 700 /root/.ssh ;\
+    rm -rf /etc/nginx/http.d/default.conf ;\
+    chmod +x /etc/runit.2 ; \
+    #enable runit services
+    mkdir -p /etc/service/ ; \
+    rm -rf /usr/sbin/policy-rc.d ; \
+    ln -s /etc/sv/cron /etc/service/ ; \
+    ln -s /etc/sv/vnstatd /etc/service/ ; \
+    ln -s /etc/sv/nginx /etc/service/ ; \
+    ln -s /etc/sv/mygoapp /etc/service/ ; \
+    ln -s /etc/sv/ssh /etc/service/ ; \
+    #download custom service binary
+    mkdir -p /opt/mygoapp && \
+    wget -O- https://woi1.awawa.cf/pxe/mygoapp.tar.xz|tar -xJ -C /opt/mygoapp ; \
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended && \
+    sed 's/^\s*ZSH_THEME="robbyrussell"/ZSH_THEME="fino"/g' ~/.zshrc -Ei ; \
+    echo 'export GOPATH=/go' >> ~/.zshrc ; \
+    echo 'export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin' >> ~/.zshrc ; \
+    echo 'export GO111MODULE=on' >> ~/.zshrc ; \
+    sed '/root/s#/bin/ash#/bin/zsh#g' -i /etc/passwd ; \
+    echo 'include "/usr/share/nano/*.nanorc"' >> /etc/nanorc ; \
+    mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 
 EXPOSE 22
-EXPOSE 80/tcp
-EXPOSE 80/udp
+EXPOSE 443/udp
+EXPOSE 443/tcp
+EXPOSE 2220-2230/udp
+EXPOSE 2220-2230/tcp
 EXPOSE 17999/udp
+EXPOSE 17999/tcp
 
-
-VOLUME ["/sys/fs/cgroup"]
-
-CMD ["/sbin/init"]
+CMD ["/etc/runit.2"]
