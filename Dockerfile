@@ -18,10 +18,13 @@ RUN \
                 ca-certificates wget curl \
                 openssh \
                 htop ncdu mtr \
-                screen zsh bash \
+                screen \
+                zsh \
+                apk-tools-zsh-completion zsh-completions \
+                bash \
                 nano nano-syntax \
                 git \
-                vnstat \
+#                vnstat \
 #                make \
                 python3 py3-pip \
                 ; \
@@ -33,7 +36,7 @@ RUN \
     mkdir -p /etc/service/ ; \
     rm -rf /usr/sbin/policy-rc.d ; \
     ln -s /etc/sv/cron /etc/service/ ; \
-    ln -s /etc/sv/vnstatd /etc/service/ ; \
+#    ln -s /etc/sv/vnstatd /etc/service/ ; \
     ln -s /etc/sv/nginx /etc/service/ ; \
     ln -s /etc/sv/mygoapp /etc/service/ ; \
     ln -s /etc/sv/ssh /etc/service/ ; \
